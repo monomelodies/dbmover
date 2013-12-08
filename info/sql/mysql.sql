@@ -1,0 +1,10 @@
+
+CREATE TABLE dbmover_version (
+    id BIGINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    filename VARCHAR(255) NOT NULL,
+    version VARCHAR(16) NOT NULL,
+    checksum VARCHAR(32) NOT NULL,
+    datecreated TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE INDEX(filename, version)
+) ENGINE='InnoDB' DEFAULT CHARSET='UTF8';
+
