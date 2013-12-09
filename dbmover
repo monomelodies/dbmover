@@ -118,7 +118,7 @@ preg_match_all(
     $matches,
     PREG_SET_ORDER
 );
-$vcheck = $db->prepare("SELECT id FROM dbmover_version WHERE filename = ? AND version = ?");
+$vcheck = $db->prepare("SELECT id, checksum FROM dbmover_version WHERE filename = ? AND version = ?");
 $vdone = $db->prepare("INSERT INTO dbmover_version (filename, version, checksum) VALUES (?, ?, ?)");
 foreach ($matches as $set) {
     $version = $set[1];
@@ -128,6 +128,7 @@ foreach ($matches as $set) {
     $vcheck->execute([$args['file'], $version]);
     if ($done = $vcheck->fetch()) {
         if ($done['checksum'] != $checksum) {
+            echo "Expected: {$done['checksum']}, calculated: $checksum\n";
             die("FATAL: checksum mismatch in $version of {$args['file']}, please resolve. Aborting now.\n");
         }
         echo "{$args['file']}, version $version was already done, skipping.\n";
