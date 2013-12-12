@@ -158,6 +158,21 @@ foreach ($matches as $set) {
                 echo "@include found, forking $command...\n";
                 passthru($command);
             }
+            $comments = [];
+            preg_replace_callback(
+                "/-- @emit (.*?)\n/m",
+                function($match) use(&$comments) {
+                    $comments[] = $match[1];
+                    return '';
+                },
+                $commands
+            );
+            if ($comments) {
+                echo "\n\n".
+                     "--------------------\n\n".
+                     "Notes for $version:\n\n".implode("\n", $comments)."\n\n"
+                     "--------------------\n\n";
+            }
             $db->beginTransaction();
             if (!$args['init']) {
                 $db->exec($commands);
