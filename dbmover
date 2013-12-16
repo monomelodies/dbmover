@@ -170,7 +170,7 @@ foreach ($matches as $set) {
             if ($comments) {
                 echo "\n\n".
                      "--------------------\n\n".
-                     "Notes for $version:\n\n".implode("\n", $comments)."\n\n"
+                     "Notes for $version:\n\n".implode("\n", $comments)."\n\n".
                      "--------------------\n\n";
             }
             $db->beginTransaction();
