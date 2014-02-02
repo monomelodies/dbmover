@@ -173,6 +173,15 @@ foreach ($matches as $set) {
                      "Notes for $version:\n\n".implode("\n", $comments)."\n\n".
                      "--------------------\n\n";
             }
+            $execs = [];
+            preg_replace_callback(
+                "/-- @exec (.*?\n/m",
+                function($match) use(&$execs) {
+                    $execs[] = $match[1];
+                    return '';
+                },
+                $commands
+            );
             $db->beginTransaction();
             if (!$args['init']) {
                 $db->exec($commands);
@@ -181,6 +190,10 @@ foreach ($matches as $set) {
                 echo "Not processing version $version in {$args['file']}, we're only initializing here.\n";
             }
             $db->commit();
+            foreach ($exec as $cmd) {
+                echo "@exec $cmd...\n";
+                passthru($cmd);
+            }
             $vdone->execute([$args['file'], $version, $checksum]);
         } catch (PDOException $e) {
             $db->rollback();
