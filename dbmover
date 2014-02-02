@@ -122,7 +122,7 @@ $vcheck = $db->prepare("SELECT id, checksum FROM dbmover_version WHERE filename 
 $vdone = $db->prepare("INSERT INTO dbmover_version (filename, version, checksum) VALUES (?, ?, ?)");
 foreach ($matches as $set) {
     $version = $set[1];
-    $commands = $set[2];
+    $commands = "\n{$set[2]}\n";
     $checksum = md5(preg_replace("@\s+@ms", '', $commands));
     echo "Checking $version in {$args['file']}...\n";
     $vcheck->execute([$args['file'], $version]);
@@ -175,7 +175,7 @@ foreach ($matches as $set) {
             }
             $execs = [];
             preg_replace_callback(
-                "/-- @exec (.*?\n/m",
+                "/-- @exec (.*?)\n/m",
                 function($match) use(&$execs) {
                     $execs[] = $match[1];
                     return '';
@@ -190,7 +190,8 @@ foreach ($matches as $set) {
                 echo "Not processing version $version in {$args['file']}, we're only initializing here.\n";
             }
             $db->commit();
-            foreach ($exec as $cmd) {
+            foreach ($execs as $cmd) {
+                $cmd = str_replace('$DIR', realpath(__DIR__), $cmd);
                 echo "@exec $cmd...\n";
                 passthru($cmd);
             }
