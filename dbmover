@@ -102,7 +102,7 @@ $args += [
     'user' => 'root',
     'pass' => '',
     'init' => false,
-    'max' => false;
+    'max' => false,
 ];
 if (!isset($args['database'])) {
     die("Abort: no database specified.\n");
