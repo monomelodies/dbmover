@@ -20,6 +20,11 @@
  * migrating an existing database with SQL scripts to dbMover. dbMover then
  * simply registers the file[s] with their latest version for future refrence.
  *
+ * The optional -m switch specifies the maximum version to parse in this run.
+ * This is especially handy in conjunction with the -i switch, but might also
+ * be useful in certain development setups. It should be followed by the maximum
+ * named version to parse.
+ *
  * dbMover works by analyzing your annotated SQL file:
  * <code>
  * -- {{{ v1.0.0
@@ -44,6 +49,10 @@
  * included in the code. For clarity, it is therefore best to place them at
  * the beginning of the block.
  *
+ * An @include /file.sql followed by a named version acts as a -m switch for
+ * that includefile. This allows you to specify an include mulitple times,
+ * with finely grained control over what should be included when.
+ *
  * Any SQL code outside of dbMover versioned block is ignored.
  */
 
@@ -65,7 +74,7 @@ for ($i = 1; $i < count($argv); $i++) {
         continue;
     }
     if ($argv[$i]{1} == 'i') {
-        $args['init'] = true;
+        $args['init'] = strlen($argv[$i]) > 2 ? substr($argv[$i], 2) : true;
         continue;
     }
     if (!isset($argv[$i + 1]) || $argv[$i + 1]{0} == '-') {
@@ -81,6 +90,9 @@ for ($i = 1; $i < count($argv); $i++) {
         case 'h':
             $args['host'] = $argv[$i + 1];
             break;
+        case 'm':
+            $args['max'] = $argv[$i + 1];
+            break;
     }
     ++$i;
 }
@@ -90,6 +102,7 @@ $args += [
     'user' => 'root',
     'pass' => '',
     'init' => false,
+    'max' => false;
 ];
 if (!isset($args['database'])) {
     die("Abort: no database specified.\n");
@@ -145,15 +158,17 @@ foreach ($matches as $set) {
                 $commands
             );
             foreach ($externals as $external) {
+                $parts = explode(' ', trim($external));
                 $command = sprintf(
-                    '%s -h %s -p%s -u %s%s %s %s',
+                    '%s %s-h %s -p%s -u %s%s %s %s',
                     $argv[0],
+                    count($parts) == 2 ? "-m {$parts[1]} " : '',
                     $args['host'],
                     $args['pass'],
                     $args['user'],
                     $args['init'] ? ' -i' : '',
                     $args['database'],
-                    $external
+                    count($parts) == 2 ? $parts[0] : $external
                 );
                 echo "@include found, forking $command...\n";
                 passthru($command);
@@ -200,6 +215,10 @@ foreach ($matches as $set) {
             $db->rollback();
             die("Error: SQL statement failed: ".$e->getMessage()."\n");
         }
+    }
+    if ($args['max'] && $args['max'] == $version) {
+        echo "Stopping at version $version as requested.\n";
+        break;
     }
 }
 
