@@ -111,7 +111,10 @@ if (!file_exists($args['file'])) {
     die("Abort: {$args['file']} does not exist.\n");
 }
 try {
-    $options = [PDO::ATTR_PERSISTENT => true];
+    $options = [
+        PDO::ATTR_PERSISTENT => true,
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ];
     if ($args['type'] == 'mysql') {
         $options[PDO::MYSQL_ATTR_INIT_COMMAND] = "SET names 'UTF8'";
     }
