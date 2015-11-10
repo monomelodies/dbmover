@@ -1,0 +1,12 @@
+{
+    "dev": {
+        "driver": "name-of-dbmover-driver",
+        "connection": {
+            "host": "host",
+            "user": "user",
+            "password": "password",
+            "database": "database"
+        },
+        "schemas": ["schema.sql"]
+    }
+}
