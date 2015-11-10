@@ -10,11 +10,10 @@
 # Mercurial backups
 *.orig
 
-# Generated files
-mg.*.js
-mg.*.css
-ie.*.js
-ie.*.css
+# Mac swapfile
+._*
 
-link2sex.nl/www/img/*/*.jpg
+.sass-cache
 
+bower_components
+node_modules
