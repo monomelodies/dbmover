@@ -1,8 +1,0 @@
-"use strict";
-
-let parser = require('node-sqlparser');
-let fs = require('fs');
-
-process.argv.slice(2).forEach(arg => {
-    let sql = fs.readFileSync('/home/monomelodies/sites/projects/sensi/tltk/info/mysql.dbmover.sql', 'utf8');
-});
