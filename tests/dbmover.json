@@ -1,0 +1,12 @@
+{
+    "dev": {
+        "driver": "dbmover-mysql",
+        "connection": {
+            "host": "localhost",
+            "user": "dbmover_user",
+            "password": "whateverpassword",
+            "database": "dbmover_test"
+        },
+        "schemas": ["schema.sql"]
+    }
+}
