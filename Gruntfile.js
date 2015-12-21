@@ -1,7 +1,6 @@
 
 module.exports = function (grunt) {
-    grunt.loadNpmTasks('grunt-babel');
-    grunt.loadNpmTasks('grunt-contrib-watch');
+    require("load-grunt-tasks")(grunt);
 
     grunt.initConfig({
         babel: {
@@ -9,14 +8,18 @@ module.exports = function (grunt) {
                 sourceMaps: false
             },
             app: {
-                files: {
-                    'index.js': 'src/dbmover.js'
-                }
+                files: [{
+                    expand: true,
+                    cwd: 'src',
+                    src: ['**/*.js'],
+                    dest: 'dist',
+                    ext: '.js'
+                }]
             }
         },
         watch: {
             app: {
-                files: ['src/dbmover.js'],
+                files: ['src/**/*.js'],
                 tasks: ['babel']
             }
         }
