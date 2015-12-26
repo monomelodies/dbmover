@@ -18,7 +18,7 @@ try {
     path = findup('lib/dbmover.js');
     // No dbMover install found!
     if (!path) {
-        console.log('Unable to find local dbmover.'.red);
+        console.log('Unable to find local dbmover!'.red);
         process.exit(99);
     }
 }
