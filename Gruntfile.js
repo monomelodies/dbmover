@@ -7,7 +7,7 @@ module.exports = function (grunt) {
             options: {
                 sourceMaps: false
             },
-            app: {
+            dist: {
                 files: [{
                     expand: true,
                     cwd: 'src',
@@ -18,7 +18,7 @@ module.exports = function (grunt) {
             }
         },
         watch: {
-            app: {
+            dist: {
                 files: ['src/**/*.js'],
                 tasks: ['babel']
             }
