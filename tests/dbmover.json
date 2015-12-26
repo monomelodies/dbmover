@@ -1,12 +1,7 @@
 {
-    "dev": {
-        "driver": "dbmover-mysql",
-        "connection": {
-            "host": "localhost",
-            "user": "dbmover_user",
-            "password": "whateverpassword",
-            "database": "dbmover_test"
-        },
-        "schemas": ["schema.sql"]
+    "mysql": {
+        "driver": "../drivers/mysql/index",
+        "dsn": "mysql://dbmover_user:whateverpassword@localhost/dbmover_test",
+        "schemas": ["mysql/create.sql", "mysql/alter.sql"]
     }
 }
