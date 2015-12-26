@@ -1,0 +1,25 @@
+{
+  "name": "dbmover-cli",
+  "version": "0.1.0",
+  "description": "Global CLI command for dbmover",
+  "main": "bin/dbmover",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monomelodies/dbmover.git"
+  },
+  "author": "Marijn Ophorst <marijn@monomelodies.nl> (http://monomelodies.nl)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/monomelodies/dbmover/issues"
+  },
+  "homepage": "https://github.com/monomelodies/dbmover#readme",
+  "dependencies": {
+    "colors": "^1.1.2",
+    "findup-sync": "^0.3.0",
+    "path": "^0.12.7",
+    "resolve": "^1.1.6"
+  }
+}
