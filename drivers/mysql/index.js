@@ -10,7 +10,7 @@ module.exports = function (config) {
     var that = {};
     var parts = config.dsn.match(/^mysql:\/\/(\w+):(.*?)@(.*?)\/(.*?)$/);
     var objs = [];
-    var database = parts[4];
+    var database = config.database = parts[4];
     var connection = mysql.createConnection(config.dsn);
 
     that.query = function (sql, params, callback) {
@@ -70,71 +70,29 @@ module.exports = function (config) {
         });
     };
 
-    that.sqlToTableDefinition = function (sql) {
-        var def = {columns: [], indices: [], constraints: []};
-        console.log(sql);
-        var lines = sql.match(/\(((\n|.)*)\)/)[1].split(/,/);
-        var isNotColumn = /^(CONSTRAINT|PRIMARY|INDEX|UNIQUE)/i;
+    that.create = function (table, callback) {
+        connection.query("SHOW CREATE TABLE " + table, callback);
+    };
 
-        lines.map(function (line) {
-            if (!line.trim().length) {
-                return;
-            }
-            var nullAllowed = true;
-            var match = undefined;
-            line = line.trim().replace(/\s*,\s*/g, ',');
-            if (match = isNotColumn.exec(line)) {
-                switch (match[1]) {
-                    
-                }
-            } else {
-                var parts = line.trim().split(/\s+/);
-                var col = {name: parts.shift(), type: parts.shift().toUpperCase(), nullable: true, 'default': undefined, serial: false};
-                try {
-                if (parts[0].match(/UNSIGNED/i)) {
-                    col.type += ' ' + parts.shift();
-                }
-                } catch (e) {
-                console.log(parts);
-                }
-                if (col.type == 'SERIAL') {
-                    col.serial = true;
-                }
-                while (parts.length) {
-                    var work = parts.shift();
-                    switch (work.toUpperCase()) {
-                        case 'PRIMARY':
-                            def.constraints.push({type: 'PRIMARY KEY', column: col.name});
-                            parts.shift(); // KEY
-                            break;
-                        case 'AUTO_INCREMENT':
-                            col.serial = true;
-                            break;
-                        case 'NOT':
-                            col.nullable = false;
-                            parts.shift(); // NULL
-                            break;
-                        case 'DEFAULT':
-                            var value = parts.shift();
-                            if (value == 'NULL') {
-                                col.nullable = true;
-                            } else {
-                                col['default'] = value;
-                            }
-                            break;
-                        case 'REFERENCES':
-                            
-                            break;
-                        default: console.log(('Unrecognised: ' + work).yellow);
-                    }
-                }
-                def.columns.push(col);
-            }
-        });
-        console.log(def);
+    that.alter = function (table, orig, proposed, callback) {
+        orig = orig.split(/\n/);
+        proposed = proposed.split(/\n/);
+        console.log(difference(proposed, orig));
+        console.log(difference(orig, proposed));
+        callback();
     };
 
     return that;
 
+};
+
+function difference(a1, a2) {
+    var result = [];
+    for (var i = 0; i < a1.length; i++) {
+        if (a2.indexOf(a1[i]) === -1) {
+            result.push(a1[i]);
+        }
+    }
+    return result;
 };
 
