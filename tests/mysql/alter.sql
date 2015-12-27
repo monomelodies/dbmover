@@ -1,10 +1,4 @@
 
--- Create table
-CREATE TABLE dbmover (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    foo VARCHAR(255)
-) ENGINE='InnoDB' DEFAULT CHARSET='UTF8';
-
 -- Alter table
 CREATE TABLE dbmover (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -13,5 +7,6 @@ CREATE TABLE dbmover (
 ) ENGINE='InnoDB' DEFAULT CHARSET='UTF8';
 
 -- Create a view
+DROP VIEW IF EXISTS test;
 CREATE VIEW test AS SELECT * FROM dbmover;
 
