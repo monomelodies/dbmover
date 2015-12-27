@@ -10,7 +10,7 @@ module.exports = function (config) {
     var that = {};
     var parts = config.dsn.match(/^mysql:\/\/(\w+):(.*?)@(.*?)\/(.*?)$/);
     var objs = [];
-    var database = parts[4];
+    var database = config.database = parts[4];
     var connection = mysql.createConnection(config.dsn);
 
     that.query = function (sql, params, callback) {
@@ -70,7 +70,29 @@ module.exports = function (config) {
         });
     };
 
+    that.create = function (table, callback) {
+        connection.query("SHOW CREATE TABLE " + table, callback);
+    };
+
+    that.alter = function (table, orig, proposed, callback) {
+        orig = orig.split(/\n/);
+        proposed = proposed.split(/\n/);
+        console.log(difference(proposed, orig));
+        console.log(difference(orig, proposed));
+        callback();
+    };
+
     return that;
 
+};
+
+function difference(a1, a2) {
+    var result = [];
+    for (var i = 0; i < a1.length; i++) {
+        if (a2.indexOf(a1[i]) === -1) {
+            result.push(a1[i]);
+        }
+    }
+    return result;
 };
 
