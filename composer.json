@@ -9,5 +9,7 @@
             "email": "marijn@monomelodies.nl"
         }
     ],
-    "require": {}
+    "require": {
+        "monomelodies/gentry": "^0.7.4"
+    }
 }
