@@ -1,0 +1,11 @@
+{
+    "mysql:dbname=INVALID": {
+        "user": "INVALID",
+        "pass": "INVALID"
+    },
+    "mysql:dbname=dbmover_test": {
+        "user": "dbmover_test",
+        "pass": "moveit",
+        "schema": ["tests/files/schema.mysql.sql"]
+    }
+}
