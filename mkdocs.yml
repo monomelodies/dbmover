@@ -1,0 +1,8 @@
+site_name: dbMover
+site_url: http://dbmover.monomelodies.nl/docs/
+repo_url: https://github.com/monomelodies/dbmover
+
+pages:
+- Home:
+    - 'Quickstart': 'index.md'
+
