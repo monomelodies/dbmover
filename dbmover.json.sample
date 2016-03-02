@@ -1,0 +1,7 @@
+{
+    "mysql:dbname=YOUR_DATABASE": {
+        "user": "USERNAME",
+        "pass": "SECRET"
+        "schema": ["/path/to/schema.sql"]
+    }
+}
