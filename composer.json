@@ -9,7 +9,19 @@
             "email": "marijn@monomelodies.nl"
         }
     ],
-    "require": {
-        "monomelodies/gentry": "^0.7.4"
+    "require": {},
+    "require-dev": {
+        "monomelodies/gentry": "^0.7",
+        "monomelodies/kingconf": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dbmover\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests"
+        }
     }
 }
