@@ -100,6 +100,9 @@ Some things are hard(er) to automatically determine. For these cases, dbMover
 creates some temporary procedures you can call in combination with simple SQL
 `IF`/`BEGIN`/`END` blocks.
 
+> Depending on your database vendor, it might be required to wrap these in a
+> "throwaway" procedure. E.g. MySQL only supports `IF` inside a procedure.
+
 ### Renaming a table
 To rename an entire table we must determine if the orginal table exists and the
 target table doesn't:
