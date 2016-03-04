@@ -52,8 +52,19 @@ EOT
 }
 
 foreach ($config as $dsn => $settings) {
+    preg_match('@^(\w+):@', $dsn, $vendor);
+    $vendor = ucfirst(strtolower($vendor[1]));
+    $class = "Dbmover\\$vendor";
+    if (!class_exists($class)) {
+        fwrite(STDOUT, <<<EOT
+\033[1;035mNotice:\033[0;37m Vendor `$vendor` is unsupported, skipping.\033[0m
+
+EOT
+        );
+        continue;
+    }
     try {
-        $db = new Dbmover($dsn, $settings);
+        $db = new $class($dsn, $settings);
     } catch (PDOException $e) {
         fwrite(STDOUT, <<<EOT
 \033[1;035mNotice:\033[0;37m `$dsn` is unavailable on this machine, skipping.\033[0m
@@ -70,6 +81,7 @@ EOT
         );
         continue;
     }
+    $any = false;
     foreach ($settings['schema'] as $schema) {
         $work = $schema;
         if ($work{0} != '/') {
@@ -83,8 +95,11 @@ EOT
             );
             continue;
         }
+        $any = true;
         $db->addSchema(file_get_contents($work));
     }
-    $db->processSchemas();
+    if ($any) {
+        $db->processSchemas();
+    }
 }
 
