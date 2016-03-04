@@ -20,6 +20,7 @@ abstract class Dbmover
     public $pdo;
     protected $schemas = [];
     protected $database;
+    protected $ignores = [];
 
     /**
      * Constructor.
@@ -37,6 +38,9 @@ abstract class Dbmover
         $pass = isset($settings['pass']) ? $settings['pass'] : null;
         $options = isset($settings['options']) ? $settings['options'] : [];
         $this->pdo = new PDO($dsn, $user, $pass, $options);
+        if (isset($options['ignore']) && is_array($options['ignore'])) {
+            $this->ignores = $options['ignore'];
+        }
     }
 
     /**
@@ -135,15 +139,19 @@ abstract class Dbmover
         }
 
         foreach ($this->getTables('VIEW') as $view) {
-            $operations[] = "DROP VIEW $view";
+            if (!$this->shouldIgnore($view)) {
+                $operations[] = "DROP VIEW $view";
+            }
         }
         foreach ($this->getRoutines() as $routine) {
-            $operations[] = sprintf(
-                "DROP %s %s%s",
-                $routine['routinetype'],
-                $routine['routinename'],
-                static::DROP_ROUTINE_SUFFIX
-            );
+            if (!$this->shouldIgnore($routine)) {
+                $operations[] = sprintf(
+                    "DROP %s %s%s",
+                    $routine['routinetype'],
+                    $routine['routinename'],
+                    static::DROP_ROUTINE_SUFFIX
+                );
+            }
         }
         foreach ($hoists as $hoist) {
             preg_match('@^CREATE (\w+) (\w+)@', $hoist, $data);
@@ -163,7 +171,9 @@ abstract class Dbmover
 
         // Cleanup: remove stuff that is not in the schema (any more)
         foreach ($this->getTables('BASE TABLE') as $table) {
-            if (!in_array($table, $tablenames)) {
+            if (!in_array($table, $tablenames)
+                && !$this->shouldIgnore($table)
+            ) {
                 $operations[] = "DROP TABLE $table CASCADE";
             }
         }
@@ -480,6 +490,21 @@ abstract class Dbmover
         ));
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Determine whether an object should be ignored as per config.
+     *
+     * @param string $object The name of the object to test.
+     */
+    protected function shouldIgnore($object)
+    {
+        foreach ($this->ignores as $regex) {
+            if (preg_match($regex, $object)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
