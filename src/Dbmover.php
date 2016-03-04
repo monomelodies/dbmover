@@ -20,7 +20,7 @@ abstract class Dbmover
     public $pdo;
     protected $schemas = [];
     protected $database;
-    protected $ignores = ['@^dbm_\w+$@'];
+    protected $ignores = [];
 
     /**
      * Constructor.
@@ -39,7 +39,7 @@ abstract class Dbmover
         $options = isset($settings['options']) ? $settings['options'] : [];
         $this->pdo = new PDO($dsn, $user, $pass, $options);
         if (isset($options['ignore']) && is_array($options['ignore'])) {
-            $this->ignores = array_merge($this->ignores, $options['ignore']);
+            $this->ignores = $options['ignore'];
         }
     }
 
@@ -74,7 +74,6 @@ abstract class Dbmover
             ' ',
             STR_PAD_RIGHT
         );
-        $this->createHelperProcedures();
         $sql = implode("\n", $this->schemas);
         $operations = [];
         $alter = $this->hoist( '@^ALTER TABLE .*?;$@ms', $sql);
@@ -182,14 +181,6 @@ abstract class Dbmover
                 $operations[] = "DROP TABLE $table CASCADE";
             }
         }
-        foreach (['table_exists', 'column_exists', 'column_type'] as $proc) {
-            $operations[] = sprintf(
-                "DROP FUNCTION dbm_%s%s",
-                $proc,
-                static::DROP_ROUTINE_SUFFIX
-            );
-        }
-        $hoistsql = implode("\n", $hoists);
 
         // Perform the actual operations and display progress meter
         echo "\033[100D\033[1;34mPerforming operations for {$this->database}...\n";
@@ -330,7 +321,6 @@ abstract class Dbmover
         }
         $stmt->execute([$this->database, $type]);
         $names = [];
-        var_dump($stmt->queryString);
         while (false !== ($table = $stmt->fetchColumn())) {
             var_dump($table);
             $names[] = $table;
@@ -483,11 +473,6 @@ abstract class Dbmover
      * @return bool
      */
     protected abstract function isPrimaryKey(&$column);
-
-    /**
-     * Create the helper procedures (dbm_*).
-     */
-    protected abstract function createHelperProcedures();
 
     /**
      * Return a list of all routines in the current catalog.
