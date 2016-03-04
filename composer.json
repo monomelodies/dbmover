@@ -16,6 +16,9 @@
         "monomelodies/gentry": "^0.8",
         "monomelodies/kingconf": "^1.0"
     },
+    "bin": [
+        "dbmover"
+    ],
     "autoload": {
         "psr-4": {
             "Dbmover\\": "src"
