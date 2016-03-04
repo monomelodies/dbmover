@@ -35,7 +35,8 @@ The format is as follows:
     "dsn": {
         "user": "yourUserName",
         "password": "something secret",
-        "schema": ["path/to/schema/file.sql"]
+        "schema": ["path/to/schema/file.sql"],
+        "ignore": ["@regex@"]
     }
 }
 ```
@@ -52,6 +53,12 @@ control alongside your project's code) or absolute.
 > Best practice: leave the config file out of source control, e.g. by adding it
 > to `.gitignore`. The database connection credentials will change seldom (if
 > ever) so setting this up should mostly be a one-time manual operation.
+
+The optional `"ignore"` entry can contain an array of regexes of objects to
+ignore during the migration (e.g. when your application automatically creates
+tables for cached data or something). The regular expressions are injected into
+PHP's `preg_match` verbatim so should also contain delimiters. They are checked
+for all objects (tables, views, procedures etc.).
 
 After defining the config file, run the executable from that same location:
 
@@ -96,77 +103,30 @@ foreign key. The single statement will fail if the key already exists, but
 that's fine - it simply means the table was up to date already.
 
 ## More complex schema changes
-Some things are hard(er) to automatically determine. For these cases, dbMover
-creates some temporary procedures you can call in combination with simple SQL
-`IF`/`BEGIN`/`END` blocks.
+Some things are hard(er) to automatically determine, like a table or column
+rename. You should wrap these changes in `IF` blocks with a condition that will
+pass when the migration needs to be done, and will otherwise fail.
 
-> Depending on your database vendor, it might be required to wrap these in a
-> "throwaway" procedure. E.g. MySQL only supports `IF` inside a procedure.
+Depending on your database vendor, it might be required to wrap these in a
+"throwaway" procedure. E.g. MySQL only supports `IF` inside a procedure. The
+vendor-specific classes in dbMover handle this for you. Throwaway procedures are
+prefixed with `tmp_`.
 
-### Renaming a table
-To rename an entire table we must determine if the orginal table exists and the
-target table doesn't:
-
-```sql
-IF dbm_table_exists('original') AND NOT dbm_table_exists('target')
-BEGIN
-    RENAME TABLE original TO target;
-END;
-```
-
-If you wouldn't write it this way, dbMover would simply assume the old table
-needed to be dropped and a new one should be created.
-
-### Renaming a column
-Similar to renaming a table:
-
-```sql
-IF dbm_column_exists('table', 'original') AND NOT dbm_column_exists('table', 'target')
-BEGIN
-    ALTER TABLE table  ALTER COLUMN original target TYPE AND OTHER STUFF;
-END;
-```
-
-### Running a query only if the table or column is (not) up to date
-Use the `dbm_table_uptodate` and `dbm_column_uptodate` functions:
-
-```sql
-IF NOT dbm_table_uptodate('table')
-BEGIN
-    -- This will be executed if something on `table` needs moving.
-END;
-
-IF NOT dbm_column_uptodate('table', 'column')
-BEGIN
-    -- This will be executed if something on `table.column` needs moving.
-END;
-```
-
-> Caution: the `_uptodate` functions will return `true` if the specified object
-> (table or column) has yet to be created.
-
-### Running a query only if the column matches a type
-Use the `dbm_column_type` function. This returns the standard SQL string as
-stored in `INFORMATION_SCHEMA.COLUMNS`. The exact format is slightly
-vendor-specific, but e.g. for MySQL:
-
-```sql
-IF NOT dbm_column_type('table', 'column') = 'bigint(21)'
-BEGIN
-    -- Do something to table.column
-END;
-```
+Note that the exact syntax of conditionals (`ELSE IF`, `ELSIF`) is also
+vendor-dependent. The exact way to determine whether a table needs renaming is
+also vendor-dependent (though in the current version dbMover only supports
+ANSI-compatible databases anyway, so you can use `INFORMATION_SCHEMA` for this
+purpose).
 
 ## Inserting default data
 To prevent duplicate inserts, these should be wrapped in an `IF NOT EXISTS ()`
 condition like so:
 
 ```sql
-IF NOT EXISTS (SELECT 1 FROM mytable WHERE id = 1)
-BEGIN
+IF NOT EXISTS (SELECT 1 FROM mytable WHERE id = 1) THEN
     INSERT INTO mytable (id, value1, value2, valueN)
         VALUES (1, 2, 3, 4);
-END;
+END IF;
 ```
 
 ## The order of things
@@ -194,10 +154,9 @@ the hoisted `IF` block runs at step 6. from the previous section:
 
 ```sql
 IF dbm_table_exists('original') AND dbm_table_uptodate('original')
-    AND dbm_table_exists('target') AND dbm_table_uptodate('target')
-BEGIN
+    AND dbm_table_exists('target') AND dbm_table_uptodate('target') THEN
     INSERT INTO target SELECT * FROM original;
-END;
+END IF;
 ```
 
 ## Caveats
@@ -214,7 +173,15 @@ dbMover also doesn't recognise e.g. MySQL's escaping of reserved words using
 backticks. Just don't do that, it's evil.
 
 For hoisting, it is assumed that statements-to-be-hoisted are at the beginning
-of lines (i.e., e.g. `/^IF /` in regular expression terms). 
+of lines (i.e., e.g. `/^IF /` in regular expression terms).
+
+Databases may or may not be case-sensitive; keep in mind that dbMover _is_
+case-sensitive, so just be consistent in your spelling.
+
+### Storage engines and collations
+dbMover ignores these. The assumption is that modifying these are a risky and
+very rare operation that you want to do manually and/or monitor more closely
+anyway.
 
 ### Test your schema first
 Always run dbMover against a test database for an updated schema. Everybody
@@ -226,6 +193,25 @@ Depending on what you're requesting and how big your dataset is, migrations
 might take a few minutes. You don't want users editing any data while the schema
 isn't in a stable state yet!
 
+How your application handles its down state is not up to dbMover. A simple way
+would be to wrap the dbMover call in a script of your own, e.g.:
+
+```sh
+touch down
+vendor/bin/dbmover
+rm down
+```
+
+...and in your application something like:
+```php
+<?php
+
+if (file_exists('down')) {
+    die("Application is down for maintainance.");
+}
+// ...other code...
+```
+
 ### Backup your database before migration
 If you tested against an actual copy and it worked fine this shouldn't be
 necessary, but better safe than sorry. You might suffer a power outage during
@@ -233,4 +219,12 @@ the migration!
 
 Besides, the simple fact that the script runs correctly doesn't necessarily mean
 it did what you intended. Always verify your data after a migration!
+
+### Note on PostgreSQL
+PostgreSQL's `INFORMATION_SCHEMA` aliases contain more data than you would
+define in a schema file, especially for routines (its native functions are also
+exposed there). Since these native functions are normally owned by the
+`postgresql` user, dbMover will try to drop them and just silently fail. So
+_always_ run dbMover as an actual database user, not as a master user (this
+goes for MySQL as well, although the above problem isn't applicable there).
 

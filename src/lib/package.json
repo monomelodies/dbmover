@@ -1,0 +1,25 @@
+{
+  "name": "dbmover",
+  "version": "0.1.0",
+  "description": "",
+  "main": "dbmover.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monomelodies/dbmover.git"
+  },
+  "author": "Marijn Ophorst <marijn@monomelodies.nl> (http://monomelodies.nl)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/monomelodies/dbmover/issues"
+  },
+  "homepage": "https://github.com/monomelodies/dbmover#readme",
+  "dependencies": {
+    "async": "^1.5.0",
+    "colors": "^1.1.2",
+    "md5": "^2.0.0",
+    "progress": "^1.1.8"
+  }
+}
