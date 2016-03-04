@@ -58,6 +58,53 @@ EOT;
      */
     protected function createHelperProcedures()
     {
+        $this->pdo->exec(sprintf(
+            <<<EOT
+DROP FUNCTION IF EXISTS dbm_table_exists();
+CREATE FUNCTION dbm_table_exists(name TEXT) RETURNS INTEGER AS $$
+BEGIN
+    SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE
+        TABLE_%s = '%s' AND TABLE_NAME = name INTO @exists;
+    RETURN @exists;
+END;
+$$ LANGUAGE='plpgsql';
+EOT
+            ,
+            self::CATALOG_COLUMN,
+            $this->database
+        ));
+        $this->pdo->exec(sprintf(
+            <<<EOT
+DROP FUNCTION IF EXISTS dbm_column_exists();
+CREATE FUNCTION dbm_column_exists(tablename TEXT, columnname TEXT) RETURNS INTEGER AS $$
+BEGIN
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE
+        TABLE_%s = '%s' AND TABLE_NAME = tablename AND COLUMN_NAME = columnname
+        INTO @exists;
+    RETURN @exists;
+END;
+$$ LANGUAGE='plpgsql';
+EOT
+            ,
+            self::CATALOG_COLUMN,
+            $this->database
+        ));
+        $this->pdo->exec(sprintf(
+            <<<EOT
+DROP FUNCTION IF EXISTS dbm_column_type();
+CREATE FUNCTION dbm_column_exists(tablename TEXT, columnname TEXT) RETURNS INTEGER AS $$
+BEGIN
+    SELECT LOWER(COLUMN_TYPE) FROM INFORMATION_SCHEMA.COLUMNS WHERE
+        TABLE_%s = '%s' AND TABLE_NAME = tablename AND COLUMN_NAME = columnname
+        INTO @columntype;
+    RETURN @columntype;
+END;
+$$ LANGUAGE='plpgsql';
+EOT
+            ,
+            self::CATALOG_COLUMN,
+            $this->database
+        ));
     }
 }
 
