@@ -7,13 +7,4 @@
 # Emacs swapfiles
 .\#*
 
-# Mercurial backups
-*.orig
-
-# Mac swapfile
-._*
-
-.sass-cache
-
-bower_components
-node_modules
+/vendor/

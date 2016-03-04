@@ -1,0 +1,13 @@
+{
+    "name": "monomelodies/dbmover",
+    "description": "PHP-based database versioning tool",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Marijn Ophorst",
+            "email": "marijn@monomelodies.nl"
+        }
+    ],
+    "require": {}
+}
