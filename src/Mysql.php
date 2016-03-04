@@ -125,7 +125,7 @@ EOT
 DROP FUNCTION IF EXISTS dbm_column_type;
 CREATE FUNCTION dbm_column_exists(tablename TEXT, columnname TEXT)
 BEGIN
-    SELECT LOWER(COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE
+    SELECT LOWER(COLUMN_TYPE) FROM INFORMATION_SCHEMA.COLUMNS WHERE
         TABLE_%s = '%s' AND TABLE_NAME = tablename AND COLUMN_NAME = columnname
         INTO @columntype;
     RETURN @columntype;
@@ -135,7 +135,6 @@ EOT
             self::CATALOG_COLUMN,
             $this->database
         ));
-
     }
 }
 
