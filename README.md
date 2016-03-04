@@ -103,9 +103,9 @@ foreign key. The single statement will fail if the key already exists, but
 that's fine - it simply means the table was up to date already.
 
 ## More complex schema changes
-Some things are hard(er) to automatically determine. For these cases, dbMover
-creates some temporary procedures you can call in combination with simple SQL
-`IF`/`END IF` blocks.
+Some things are hard(er) to automatically determine, like a table or column
+rename. You should wrap these changes in `IF` blocks with a condition that will
+pass when the migration needs to be done, and will otherwise fail.
 
 Depending on your database vendor, it might be required to wrap these in a
 "throwaway" procedure. E.g. MySQL only supports `IF` inside a procedure. The
@@ -113,48 +113,10 @@ vendor-specific classes in dbMover handle this for you. Throwaway procedures are
 prefixed with `tmp_`.
 
 Note that the exact syntax of conditionals (`ELSE IF`, `ELSIF`) is also
-vendor-dependent. The examples below are therefore necessarily slightly
-pseudo-code.
-
-### Renaming a table
-To rename an entire table we must determine if the orginal table exists and the
-target table doesn't:
-
-```sql
-IF dbm_table_exists('original') AND NOT dbm_table_exists('target') THEN
-    RENAME TABLE original TO target;
-END IF;
-```
-
-If you wouldn't write it this way, dbMover would simply assume the old table
-needed to be dropped and a new one should be created.
-
-### Renaming a column
-Similar to renaming a table:
-
-```sql
-IF dbm_column_exists('table', 'original') AND NOT dbm_column_exists('table', 'target') THEN
-    ALTER TABLE table  ALTER COLUMN original target TYPE AND OTHER STUFF;
-END IF;
-```
-
-### Running a query only if the column matches a type
-Use the `dbm_column_type` function. This returns the standard SQL string as
-stored in `INFORMATION_SCHEMA.COLUMNS`. The exact format is slightly
-vendor-specific, but e.g. for MySQL:
-
-```sql
-IF NOT dbm_column_type('table', 'column') = 'bigint(21)' THEN
-    -- Do something to table.column
-END;
-```
-
-> Note: column types are - partly - also vendor-specific. To minimize
-> compatibility issues, dbMover does return them lowercased, but otherwise take
-> care. E.g. `bigint` is specific to MySQL, where PostgreSQL simply uses
-> `integer`.
-
-Be aware that this function returns `NULL` if the column does not exist.
+vendor-dependent. The exact way to determine whether a table needs renaming is
+also vendor-dependent (though in the current version dbMover only supports
+ANSI-compatible databases anyway, so you can use `INFORMATION_SCHEMA` for this
+purpose).
 
 ## Inserting default data
 To prevent duplicate inserts, these should be wrapped in an `IF NOT EXISTS ()`
@@ -257,4 +219,12 @@ the migration!
 
 Besides, the simple fact that the script runs correctly doesn't necessarily mean
 it did what you intended. Always verify your data after a migration!
+
+### Note on PostgreSQL
+PostgreSQL's `INFORMATION_SCHEMA` aliases contain more data than you would
+define in a schema file, especially for routines (its native functions are also
+exposed there). Since these native functions are normally owned by the
+`postgresql` user, dbMover will try to drop them and just silently fail. So
+_always_ run dbMover as an actual database user, not as a master user (this
+goes for MySQL as well, although the above problem isn't applicable there).
 
