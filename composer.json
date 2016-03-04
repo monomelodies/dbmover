@@ -23,7 +23,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Dbmover\\Tests\\": "tests"
+            "Dbmover\\Test\\": "tests"
         }
     }
 }
