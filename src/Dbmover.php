@@ -20,7 +20,7 @@ abstract class Dbmover
     public $pdo;
     protected $schemas = [];
     protected $database;
-    protected $ignores = [];
+    protected $ignores = ['@^dbm_\w+$@'];
 
     /**
      * Constructor.
@@ -39,7 +39,7 @@ abstract class Dbmover
         $options = isset($settings['options']) ? $settings['options'] : [];
         $this->pdo = new PDO($dsn, $user, $pass, $options);
         if (isset($options['ignore']) && is_array($options['ignore'])) {
-            $this->ignores = $options['ignore'];
+            $this->ignores = array_merge($this->ignores, $options['ignore']);
         }
     }
 
@@ -153,6 +153,11 @@ abstract class Dbmover
                 );
             }
         }
+        foreach ($this->getTriggers() as $trigger) {
+            if (!$this->shouldIgnore($trigger)) {
+                $operations[] = "DROP TRIGGER $trigger";
+            }
+        }
         foreach ($hoists as $hoist) {
             preg_match('@^CREATE (\w+) (\w+)@', $hoist, $data);
             if ($data[1] == 'FUNCTION' && $this instanceof Pgsql) {
@@ -176,6 +181,13 @@ abstract class Dbmover
             ) {
                 $operations[] = "DROP TABLE $table CASCADE";
             }
+        }
+        foreach (['table_exists', 'column_exists', 'column_type'] as $proc) {
+            $operations[] = sprintf(
+                "DROP FUNCTION dbm_%s%s",
+                $proc,
+                static::DROP_ROUTINE_SUFFIX
+            );
         }
         $hoistsql = implode("\n", $hoists);
 
@@ -477,6 +489,11 @@ abstract class Dbmover
      */
     protected abstract function createHelperProcedures();
 
+    /**
+     * Return a list of all routines in the current catalog.
+     *
+     * @return array Array of routines, including meta-information.
+     */
     protected function getRoutines()
     {
         $stmt = $this->pdo->prepare(sprintf(
@@ -491,6 +508,29 @@ abstract class Dbmover
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Return a list of all triggers in the current catalog.
+     *
+     * @return array Array of trigger names.
+     */
+    protected function getTriggers()
+    {
+        $stmt = $this->pdo->prepare(sprintf(
+            "SELECT TRIGGER_NAME triggername
+                FROM INFORMATION_SCHEMA.TRIGGERS WHERE
+                TRIGGER_%s = '%s'",
+            static::CATALOG_COLUMN,
+            $this->database
+        ));
+        $stmt->execute();
+        $triggers = [];
+        foreach ($stmt->fetchAll() as $trigger) {
+            $triggers[] = $trigger['triggername'];
+        }
+        return $triggers;
+    }
+
 
     /**
      * Determine whether an object should be ignored as per config.
