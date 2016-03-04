@@ -34,7 +34,9 @@ EOT
      * Initially, `test` contains three columns {?}. After we run the migration,
      * there should be four {?}. We should also have a view called `viewtest`
      * {?} and the inserted row has '3' for `bar` since a trigger was created
-     * during the migration {?}.
+     * during the migration {?}. During the migration, we can also call
+     * `dbm_table_exists`, `dbm_column_exists` and `dbm_column_type` and they
+     * return the expected results {?}.
      */
     public function migrations(Dbmover\Mysql &$mysql = null)
     {
