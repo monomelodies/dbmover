@@ -90,6 +90,45 @@ Just remove them from the schema and re-run.
 ## Dropping tables
 Just remove them from the schema and re-run.
 
+## Foreign key constraints and indexes
+Depending on your database vendor, it may be allowed to specify these during
+table creation. That would mean dbMover never sees them if the table already
+exists! _So don't do that._ Instead, create these constraints after table
+creation using `ALTER TABLE` statements. The exception is a primary key on an
+`AUTOINCREMENT`/`SERIAL` field since table creation would fail when the
+constraint is missing. However, these column rarely if ever change, and even if
+they do you can manually apply the change using an `IF` block with the correct
+check on pre/post state.
+
+An example in MySQL:
+
+```sql
+-- This is *wrong*:
+CREATE TABLE foo (
+    id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    bar INTEGER,
+    INDEX (bar),
+    CONSTRAINT FOREIGN KEY (bar) REFERENCES buzz(id)
+) ENGINE='InnoDB';
+
+-- Write it like this instead:
+CREATE TABLE foo (
+    id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    bar INTEGER,
+) ENGINE='InnoDB';
+ALTER TABLE foo ADD INDEX (bar),
+    ADD CONSTRAINT FOREIGN KEY (bar) REFERENCES buzz(id);
+```
+
+The reason is that during the migration, dbMover will `DROP` all existing
+constraints and recreate them during the migration to ensure only the
+constraints intended by your schema exist on the database. This is the most
+surefire way to accomplish this, as opposed to analysing your SQL statements,
+accounting for vendor-specific syntax etc.etc.etc.
+
+> For extremely large tables, recreating indexes might considerably slow down
+> the moving process. C'est la vie.
+
 ## Loose `ALTER` statements
 Sometimes you need to `ALTER` a table after creation specifically, e.g. when it
 has a foreign key referring to a table you need to create later on. For example,
