@@ -109,8 +109,8 @@ abstract class Dbmover
             "SELECT TABLE_NAME tbl, CONSTRAINT_NAME constr
                 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
                 WHERE CONSTRAINT_TYPE = 'FOREIGN KEY'
-                AND TABLE_%s = ?",
-            self::CATALOG_COLUMN
+                AND CONSTRAINT_%s = ?",
+            static::CATALOG_COLUMN
         ));
         $stmt->execute([$this->database]);
         if ($fks = $stmt->fetchAll()) {
