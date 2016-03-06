@@ -84,7 +84,7 @@ abstract class Dbmover
             $if = $this->wrapInProcedure($if);
         }
 
-        $operations = array_merge($operations, $alter, $ifs);
+        $operations = array_merge($operations, $ifs);
         $tables = $this->hoist('@^CREATE TABLE .*?;$@ms', $sql);
 
         // Hoist all other recreatable objects.
