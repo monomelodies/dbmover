@@ -85,7 +85,7 @@ EOT
     foreach ($settings['schema'] as $schema) {
         $work = $schema;
         if ($work{0} != '/') {
-            $work = __DIR__."/$work";
+            $work = getcwd()."/$work";
         }
         if (!file_exists($work)) {
             fwrite(STDOUT, <<<EOT
