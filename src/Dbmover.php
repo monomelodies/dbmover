@@ -322,7 +322,6 @@ abstract class Dbmover
         $stmt->execute([$this->database, $type]);
         $names = [];
         while (false !== ($table = $stmt->fetchColumn())) {
-            var_dump($table);
             $names[] = $table;
         }
         return $names;
