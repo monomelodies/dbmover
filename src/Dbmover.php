@@ -103,6 +103,28 @@ abstract class Dbmover
             )
         );
 
+        // Before we begin working on tables, we drop all existing foreign key
+        // constraints and indexes so they can safely be recreated.
+        $stmt = $this->pdo->prepare(sprintf(
+            "SELECT TABLE_NAME tbl, CONSTRAINT_NAME constr
+                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+                WHERE CONSTRAINT_TYPE = 'FOREIGN KEY'
+                AND TABLE_%s = ?",
+            self::CATALOG_COLUMN
+        ));
+        $stmt->execute([$this->database]);
+        if ($fks = $stmt->fetchAll()) {
+            foreach ($fks as $row) {
+                $operations[] = "ALTER TABLE {$row['tbl']}
+                    DROP FOREIGN KEY {$row['constr']}";
+            }
+        }
+        if ($indexes = $this->getIndexes()) {
+            foreach ($indexes as $index) {
+                $operations[] = "ALTER TABLE {$index['tbl']}
+                    DROP INDEX {$index['idx']}";
+            }
+        }
         $tablenames = [];
         foreach ($tables as $table) {
             preg_match('@^CREATE TABLE (\w+) ?\(@', $table, $name);
@@ -173,7 +195,7 @@ abstract class Dbmover
         // Rerun ifs and alters
         $operations = array_merge($operations, $alter, $ifs);
 
-        // Cleanup: remove stuff that is not in the schema (any more)
+        // Cleanup: remove tables that are not in the schema (any more)
         foreach ($this->getTables('BASE TABLE') as $table) {
             if (!in_array($table, $tablenames)
                 && !$this->shouldIgnore($table)
