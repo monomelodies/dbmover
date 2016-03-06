@@ -310,15 +310,12 @@ abstract class Dbmover
      */
     protected function getTables($type = 'BASE TABLE')
     {
-        static $stmt;
-        if (!isset($stmt)) {
-            $stmt = $this->pdo->prepare(sprintf(
-                "SELECT TABLE_NAME
-                    FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_%s = ? AND TABLE_TYPE = ?",
-                static::CATALOG_COLUMN
-            ));
-        }
+        $stmt = $this->pdo->prepare(sprintf(
+            "SELECT TABLE_NAME
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_%s = ? AND TABLE_TYPE = ?",
+            static::CATALOG_COLUMN
+        ));
         $stmt->execute([$this->database, $type]);
         $names = [];
         while (false !== ($table = $stmt->fetchColumn())) {
@@ -348,22 +345,19 @@ abstract class Dbmover
      */
     protected function getTableDefinition($name)
     {
-        static $stmt;
-        if (!isset($stmt)) {
-            $stmt = $this->pdo->prepare(sprintf(
-                "SELECT
-                    COLUMN_NAME name,
-                    COLUMN_DEFAULT def,
-                    IS_NULLABLE nullable,
-                    COLUMN_TYPE coltype,
-                    COLUMN_KEY colkey,
-                    EXTRA extra
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_%s = ? AND TABLE_NAME = ?
-                ORDER BY ORDINAL_POSITION ASC",
-                static::CATALOG_COLUMN
-            ));
-        }
+        $stmt = $this->pdo->prepare(sprintf(
+            "SELECT
+                COLUMN_NAME name,
+                COLUMN_DEFAULT def,
+                IS_NULLABLE nullable,
+                COLUMN_TYPE coltype,
+                COLUMN_KEY colkey,
+                EXTRA extra
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_%s = ? AND TABLE_NAME = ?
+            ORDER BY ORDINAL_POSITION ASC",
+            static::CATALOG_COLUMN
+        ));
         $stmt->execute([$this->database, $name]);
         $cols = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
@@ -387,11 +381,14 @@ abstract class Dbmover
     protected function parseTableDefinition($schema)
     {
         preg_match("@CREATE TABLE \w+ \((.*)\)@ms", $schema, $extr);
-        $lines = explode(',', $extr[1]);
+        $lines = preg_split('@,$@m', rtrim($extr[1]));
         $extra = $cols = [];
         foreach ($lines as &$line) {
             $line = trim($line);
-            if (preg_match('@^(CONSTRAINT|UNIQUE|INDEX|PRIMARY)@', $line)) {
+            if (preg_match(
+                '@^(CONSTRAINT|UNIQUE|INDEX|PRIMARY)@',
+                trim($line)
+            )) {
                 $extra[] = $line;
                 continue;
             }
@@ -410,15 +407,19 @@ abstract class Dbmover
             if (!$this->isNullable($line)) {
                 $column['nullable'] = 'NO';
             }
+            $line = str_replace($name[0], '', $line);
             if ($this->isAutoIncrement($line)) {
                 $column['extra'] = 'auto_increment';
             }
+            $line = str_replace($name[0], '', $line);
             if ($this->isPrimaryKey($line)) {
                 $column['key'] = 'PRI';
             }
+            $line = str_replace($name[0], '', $line);
             if ($default = $this->getDefaultValue($line)) {
                 $column['def'] = $default;
             }
+            $line = str_replace($name[0], '', $line);
             $line = preg_replace('@REFERENCES.*?$@', '', $line);
             $column['coltype'] = strtolower(trim($line));
             $cols[$name[0]] = $column;
