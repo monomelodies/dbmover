@@ -2,11 +2,11 @@
     "mysql:dbname=dbmover_test": {
         "user": "dbmover_test",
         "pass": "moveit",
-        "schema": ["tests/files/schema.mysql.sql"]
+        "schema": ["files/schema.mysql.sql"]
     },
     "pgsql:dbname=dbmover_test": {
         "user": "dbmover_test",
         "pass": "moveit",
-        "schema": ["tests/files/schema.pgsql.sql"]
+        "schema": ["files/schema.pgsql.sql"]
     }
 }

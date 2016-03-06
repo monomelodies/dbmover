@@ -101,5 +101,6 @@ EOT
     if ($any) {
         $db->processSchemas();
     }
+    unset($db);
 }
 

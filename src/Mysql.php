@@ -85,5 +85,17 @@ EOT;
         );
         return [$sql];
     }
+
+    protected function getIndexes()
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT DISTINCT table_name AS tbl,
+                index_name idx 
+                FROM INFORMATION_SCHEMA.STATISTICS
+                WHERE table_schema = ?"
+        );
+        $stmt->execute([$this->database]);
+        return $stmt->fetchAll();
+    }
 }
 
