@@ -83,6 +83,9 @@ EOT;
             " CHANGE COLUMN {$definition['name']} ",
             $sql
         );
+        if ($definition['extra'] == 'auto_increment') {
+            $sql .= ' AUTO_INCREMENT';
+        }
         return [$sql];
     }
 
