@@ -252,7 +252,7 @@ abstract class Dbmover
                     " DEFAULT %s",
                     is_null($definition['def']) ?
                         'NULL' :
-                        $this->pdo->quote($definition['def'])
+                        $definition['def']
                 ) :
                 ''
         );
