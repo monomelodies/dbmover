@@ -279,7 +279,6 @@ abstract class Dbmover
         } else {
             $operations[] = "$base DROP DEFAULT";
         }
-        var_dump($operations);
         return $operations;
     }
 
