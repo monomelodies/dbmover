@@ -13,7 +13,7 @@ class Pgsql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isAutoIncrement(&$column)
+    public function isAutoIncrement(&$column)
     {
         if (preg_match('@SERIAL@', $column)) {
             return true;
@@ -27,7 +27,7 @@ class Pgsql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isPrimaryKey(&$column)
+    public function isPrimaryKey(&$column)
     {
         return strpos($column, 'SERIAL');
     }
@@ -38,7 +38,7 @@ class Pgsql extends Dbmover
      * @param string $sql The SQL to wrap.
      * @return string The input SQL wrapped and called.
      */
-    protected function wrapInProcedure($sql)
+    public function wrapInProcedure($sql)
     {
         $tmp = 'tmp_'.md5(microtime(true));
         return <<<EOT
@@ -53,7 +53,7 @@ DROP FUNCTION $tmp();
 EOT;
     }
 
-    protected function getIndexes()
+    public function getIndexes()
     {
         $stmt = $this->pdo->prepare(
             "SELECT
@@ -67,6 +67,24 @@ EOT;
             WHERE NOT nspname LIKE 'pg%' AND U.usename = ?");
         $stmt->execute([$this->database]);
         return $stmt->fetchAll();
+    }
+
+    public function dropRoutines()
+    {
+        // Source: http://stackoverflow.com/questions/7622908/drop-function-without-knowing-the-number-type-of-parameters
+        $stmt = $this->pdo->prepare(
+            "SELECT format('DROP FUNCTION %s(%s);',
+                oid::regproc,
+                pg_get_function_identity_arguments(oid)) the_query
+            FROM pg_proc
+            WHERE proname = ?
+            AND pg_function_is_visible(oid)");
+        foreach ($this->getRoutines() as $routine) {
+            $stmt->execute([$routine['routinename']]);
+            while ($query = $stmt->fetchColumn()) {
+                $this->pdo->exec($query);
+            }
+        }
     }
 }
 
