@@ -23,7 +23,7 @@ class Mysql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isAutoIncrement(&$column)
+    public function isAutoIncrement(&$column)
     {
         if (strpos($column, 'AUTO_INCREMENT') !== false) {
             $column = str_replace('AUTO_INCREMENT', '', $column);
@@ -38,7 +38,7 @@ class Mysql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isPrimaryKey(&$column)
+    public function isPrimaryKey(&$column)
     {
         if (strpos($column, 'PRIMARY KEY')) {
             $column = str_replace('PRIMARY KEY', '', $column);
@@ -53,7 +53,7 @@ class Mysql extends Dbmover
      * @param string $sql The SQL to wrap.
      * @return string The input SQL wrapped and called.
      */
-    protected function wrapInProcedure($sql)
+    public function wrapInProcedure($sql)
     {
         $tmp = 'tmp_'.md5(microtime(true));
         return <<<EOT
@@ -75,7 +75,7 @@ EOT;
      * @return array An array of SQL, in this case containing a single
      *  ALTER TABLE statement.
      */
-    protected function alterColumn($name, array $definition)
+    public function alterColumn($name, array $definition)
     {
         $sql = $this->addColumn($name, $definition);
         $sql = str_replace(
@@ -89,7 +89,7 @@ EOT;
         return [$sql];
     }
 
-    protected function getIndexes()
+    public function getIndexes()
     {
         $stmt = $this->pdo->prepare(
             "SELECT DISTINCT table_name AS tbl,
