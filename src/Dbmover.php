@@ -233,7 +233,7 @@ abstract class Dbmover
         return sprintf(
             "ALTER TABLE %s ADD COLUMN %s %s%s%s",
             $table,
-            $definition['name'],
+            $definition['colname'],
             $definition['coltype'],
             $definition['nullable'] == 'NO' ?
                 ' NOT NULL' :
@@ -263,7 +263,7 @@ abstract class Dbmover
         $base = sprintf(
             "ALTER TABLE %s ALTER COLUMN %s",
             $table,
-            $definition['name']
+            $definition['colname']
         );
         $operations[] = "$base TYPE {$definition['coltype']}";
         if ($definition['nullable'] == 'NO') {
@@ -279,6 +279,7 @@ abstract class Dbmover
         } else {
             $operations[] = "$base DROP DEFAULT";
         }
+        var_dump($operations);
         return $operations;
     }
 
@@ -360,12 +361,10 @@ abstract class Dbmover
     {
         $stmt = $this->pdo->prepare(sprintf(
             "SELECT
-                COLUMN_NAME name,
+                COLUMN_NAME colname,
                 COLUMN_DEFAULT def,
                 IS_NULLABLE nullable,
-                COLUMN_TYPE coltype,
-                COLUMN_KEY colkey,
-                EXTRA extra
+                DATA_TYPE coltype
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_%s = ? AND TABLE_NAME = ?
             ORDER BY ORDINAL_POSITION ASC",
@@ -406,24 +405,19 @@ abstract class Dbmover
                 continue;
             }
             $column = [
-                'name' => '',
+                'colname' => '',
                 'def' => null,
                 'nullable' => 'YES',
                 'coltype' => '',
-                'colkey' => '',
-                'extra' => '',
             ];
             // Extract the name
             preg_match('@^\w+@', $line, $name);
-            $column['name'] = $name[0];
+            $column['colname'] = $name[0];
             $line = str_replace($name[0], '', $line);
             if (!$this->isNullable($line)) {
                 $column['nullable'] = 'NO';
             }
             $line = str_replace($name[0], '', $line);
-            if ($this->isAutoIncrement($line)) {
-                $column['extra'] = 'auto_increment';
-            }
             $line = str_replace($name[0], '', $line);
             if ($this->isPrimaryKey($line)) {
                 $column['key'] = 'PRI';
