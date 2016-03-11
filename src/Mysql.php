@@ -8,6 +8,7 @@ class Mysql extends Dbmover
 {
     const CATALOG_COLUMN = 'SCHEMA';
     const DROP_ROUTINE_SUFFIX = '';
+    const DROP_CONSTRAINT = 'FOREIGN KEY';
 
     /**
      * Process the schemas, wrapped for MySQL.
