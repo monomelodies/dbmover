@@ -203,6 +203,7 @@ abstract class Dbmover
         $operations = array_merge(
             $this->dropConstraints(),
             $this->dropIndexes(),
+            $this->dropRoutines(),
             $this->dropTriggers()
         );
         foreach ($this->getTables('VIEW') as $view) {
