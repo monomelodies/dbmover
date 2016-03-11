@@ -16,6 +16,7 @@ abstract class Dbmover
     const REGEX_PROCEDURES = '@^CREATE (PROCEDURE|FUNCTION).*?^END;$@ms';
     const REGEX_TRIGGERS = '@^CREATE TRIGGER.*?^END;$@ms';
     const DROP_ROUTINE_SUFFIX = '()';
+    const DROP_CONSTRAINT = 'CONSTRAINT';
 
     public $pdo;
     public $schemas = [];
@@ -115,8 +116,11 @@ abstract class Dbmover
         $stmt->execute([$this->database]);
         if ($fks = $stmt->fetchAll()) {
             foreach ($fks as $row) {
-                $operations[] = "ALTER TABLE {$row['tbl']}
-                    DROP FOREIGN KEY {$row['constr']}";
+                $operations[] = sprintf(
+                    "ALTER TABLE {$row['tbl']}
+                        DROP %s {$row['constr']}",
+                    static::DROP_CONSTRAINT
+                );
             }
         }
         if ($indexes = $this->getIndexes()) {
