@@ -164,7 +164,7 @@ abstract class Dbmover
                 $operations[] = "DROP VIEW $view";
             }
         }
-        $this->dropRoutines();
+        $operations = array_merge($operations, $this->dropRoutines());
         foreach ($this->getTriggers() as $trigger) {
             if (!$this->shouldIgnore($trigger)) {
                 $operations[] = "DROP TRIGGER $trigger";
@@ -356,31 +356,7 @@ abstract class Dbmover
      * @param string $name The name of the table.
      * @return array A hash of columns, where the key is also the column name.
      */
-    public function getTableDefinition($name)
-    {
-        $stmt = $this->pdo->prepare(sprintf(
-            "SELECT
-                COLUMN_NAME colname,
-                COLUMN_DEFAULT def,
-                IS_NULLABLE nullable,
-                DATA_TYPE coltype
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_%s = ? AND TABLE_NAME = ?
-            ORDER BY ORDINAL_POSITION ASC",
-            static::CATALOG_COLUMN
-        ));
-        $stmt->execute([$this->database, $name]);
-        $cols = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
-            if (is_null($column['def'])) {
-                $column['def'] = 'NULL';
-            } else {
-                $column['def'] = $this->pdo->quote($column['def']);
-            }
-            $cols[$column['name']] = $column;
-        }
-        return $cols;
-    }
+    public abstract function getTableDefinition($name);
 
     /**
      * Parse the table definition as specified in the schema into a format
@@ -393,21 +369,15 @@ abstract class Dbmover
     {
         preg_match("@CREATE TABLE \w+ \((.*)\)@ms", $schema, $extr);
         $lines = preg_split('@,$@m', rtrim($extr[1]));
-        $extra = $cols = [];
+        $cols = [];
         foreach ($lines as &$line) {
             $line = trim($line);
-            if (preg_match(
-                '@^(CONSTRAINT|UNIQUE|INDEX|PRIMARY)@',
-                trim($line)
-            )) {
-                $extra[] = $line;
-                continue;
-            }
             $column = [
                 'colname' => '',
                 'def' => null,
                 'nullable' => 'YES',
                 'coltype' => '',
+                'is_serial' => false,
             ];
             // Extract the name
             preg_match('@^\w+@', $line, $name);
@@ -420,6 +390,9 @@ abstract class Dbmover
             $line = str_replace($name[0], '', $line);
             if ($this->isPrimaryKey($line)) {
                 $column['key'] = 'PRI';
+            }
+            if ($this->isSerial($line)) {
+                $column['is_serial'] = true;
             }
             $line = str_replace($name[0], '', $line);
             if ($default = $this->getDefaultValue($line)) {
@@ -465,12 +438,15 @@ abstract class Dbmover
     }
 
     /**
-     * Checks whether a column is an auto_increment column.
+     * Checks whether a column is a "serial" column.
+     *
+     * Vendors have different implementations of this, e.g. MySQL "tags" the
+     * column as "auto_increment" whilst PostgreSQL uses a `SERIAL` data type.
      *
      * @param string $column The referenced column definition.
      * @return bool
      */
-    public abstract function isAutoIncrement(&$column);
+    public abstract function isSerial(&$column);
     
     /**
      * Checks whether a column is a primary key.
@@ -502,6 +478,7 @@ abstract class Dbmover
 
     public function dropRoutines()
     {
+        $operations = [];
         foreach ($this->getRoutines() as $routine) {
             if (!$this->shouldIgnore($routine)) {
                 $operations[] = sprintf(
@@ -512,6 +489,7 @@ abstract class Dbmover
                 );
             }
         }
+        return $operations;
     }
 
     /**
