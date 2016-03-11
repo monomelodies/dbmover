@@ -125,5 +125,27 @@ EOT;
         }
         return $operations;
     }
+
+    public function dropTriggers()
+    {
+        $tmp = md5(microtime(true));
+        return [<<<EOT
+CREATE OR REPLACE FUNCTION strip_$tmp() RETURNS text AS $$ DECLARE
+triggNameRecord RECORD;
+triggTableRecord RECORD;
+BEGIN
+    FOR triggNameRecord IN select distinct(trigger_name) from information_schema.triggers where trigger_schema = 'public' LOOP
+        FOR triggTableRecord IN SELECT distinct(event_object_table) from information_schema.triggers where trigger_name = triggNameRecord.trigger_name LOOP
+            EXECUTE 'DROP TRIGGER ' || triggNameRecord.trigger_name || ' ON ' || triggTableRecord.event_object_table || ';';
+        END LOOP;
+    END LOOP;
+    RETURN 'done';
+END;
+$$ LANGUAGE plpgsql;
+select strip_$tmp();
+DROP FUNCTION strip_$tmp();
+EOT
+        ];
+    }
 }
 

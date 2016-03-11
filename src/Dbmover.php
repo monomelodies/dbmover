@@ -104,31 +104,8 @@ abstract class Dbmover
             )
         );
 
-        // Before we begin working on tables, we drop all existing foreign key
-        // constraints and indexes so they can safely be recreated.
-        $stmt = $this->pdo->prepare(sprintf(
-            "SELECT TABLE_NAME tbl, CONSTRAINT_NAME constr
-                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                WHERE CONSTRAINT_TYPE = 'FOREIGN KEY'
-                AND CONSTRAINT_%s = ?",
-            static::CATALOG_COLUMN
-        ));
-        $stmt->execute([$this->database]);
-        if ($fks = $stmt->fetchAll()) {
-            foreach ($fks as $row) {
-                $operations[] = sprintf(
-                    "ALTER TABLE {$row['tbl']}
-                        DROP %s {$row['constr']}",
-                    static::DROP_CONSTRAINT
-                );
-            }
-        }
-        if ($indexes = $this->getIndexes()) {
-            foreach ($indexes as $index) {
-                $operations[] = "ALTER TABLE {$index['tbl']}
-                    DROP INDEX {$index['idx']}";
-            }
-        }
+        $operations = array_merge($operations, $this->dropRecreatables());
+
         $tablenames = [];
         foreach ($tables as $table) {
             preg_match('@^CREATE TABLE (\w+) ?\(@', $table, $name);
@@ -163,17 +140,6 @@ abstract class Dbmover
             }
         }
 
-        foreach ($this->getTables('VIEW') as $view) {
-            if (!$this->shouldIgnore($view)) {
-                $operations[] = "DROP VIEW $view";
-            }
-        }
-        $operations = array_merge($operations, $this->dropRoutines());
-        foreach ($this->getTriggers() as $trigger) {
-            if (!$this->shouldIgnore($trigger)) {
-                $operations[] = "DROP TRIGGER $trigger";
-            }
-        }
         foreach ($hoists as $hoist) {
             preg_match('@^CREATE (\w+) (\w+)@', $hoist, $data);
             if ($data[1] == 'FUNCTION' && $this instanceof Pgsql) {
@@ -223,6 +189,87 @@ abstract class Dbmover
         
         $bar->end();
         echo "\033[0m";
+    }
+
+    /**
+     * Drops all recreatable objects (views, procedures, indexes etc.) from the
+     * current database so they can safely be recreated during the upgrade
+     * process.
+     *
+     * @return array Array of SQL operations.
+     */
+    public function dropRecreatables()
+    {
+        $operations = array_merge(
+            $this->dropConstraints(),
+            $this->dropIndexes(),
+            $this->dropRoutines(),
+            $this->dropTriggers()
+        );
+        foreach ($this->getTables('VIEW') as $view) {
+            if (!$this->shouldIgnore($view)) {
+                $operations[] = "DROP VIEW $view";
+            }
+        }
+        return $operations;
+    }
+
+    /**
+     * Generate drop statements for all foreign key constraints in the database.
+     *
+     * @return array Array of SQL operations.
+     */
+    public function dropConstraints()
+    {
+        $operations = [];
+        $stmt = $this->pdo->prepare(sprintf(
+            "SELECT TABLE_NAME tbl, CONSTRAINT_NAME constr
+                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+                WHERE CONSTRAINT_TYPE = 'FOREIGN KEY'
+                    AND CONSTRAINT_%s = ?",
+            static::CATALOG_COLUMN
+        ));
+        $stmt->execute([$this->database]);
+        if ($fks = $stmt->fetchAll()) {
+            foreach ($fks as $row) {
+                $operations[] = sprintf(
+                    "ALTER TABLE {$row['tbl']} DROP %s {$row['constr']}",
+                    static::DROP_CONSTRAINT
+                );
+            }
+        }
+        return $operations;
+    }
+
+    /**
+     * Generate drop statements for all indexes in the database.
+     *
+     * @return array Array of SQL operations.
+     */
+    public function dropIndexes()
+    {
+        $operations = [];
+        if ($indexes = $this->getIndexes()) {
+            foreach ($indexes as $index) {
+                $operations[] = "ALTER TABLE {$index['tbl']}
+                    DROP INDEX {$index['idx']}";
+            }
+        }
+        return $operations;
+    }
+
+    /**
+     * Generate drop statements for all triggers in the database.
+     *
+     * @return array Array of SQL operations.
+     */
+    public function dropTriggers()
+    {
+        $operations = [];
+        foreach ($this->getTriggers() as $trigger) {
+            $operations[] = "DROP TRIGGER $trigger";
+        }
+        return $operations;
     }
 
     /**
@@ -518,6 +565,8 @@ abstract class Dbmover
         return $triggers;
     }
 
+    /**
+     * Return an array of statements 
 
     /**
      * Determine whether an object should be ignored as per config.
