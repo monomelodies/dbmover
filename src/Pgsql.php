@@ -2,6 +2,8 @@
 
 namespace Dbmover;
 
+use PDO;
+
 class Pgsql extends Dbmover
 {
     const REGEX_PROCEDURES = "@^CREATE (FUNCTION|PROCEDURE).*?AS.*?LANGUAGE '.*?';$@ms";
@@ -13,7 +15,7 @@ class Pgsql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isAutoIncrement(&$column)
+    public function isSerial(&$column)
     {
         if (preg_match('@SERIAL@', $column)) {
             return true;
@@ -27,7 +29,7 @@ class Pgsql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isPrimaryKey(&$column)
+    public function isPrimaryKey(&$column)
     {
         return strpos($column, 'SERIAL');
     }
@@ -38,7 +40,7 @@ class Pgsql extends Dbmover
      * @param string $sql The SQL to wrap.
      * @return string The input SQL wrapped and called.
      */
-    protected function wrapInProcedure($sql)
+    public function wrapInProcedure($sql)
     {
         $tmp = 'tmp_'.md5(microtime(true));
         return <<<EOT
@@ -53,7 +55,40 @@ DROP FUNCTION $tmp();
 EOT;
     }
 
-    protected function getIndexes()
+    /**
+     * PostgreSQL-specific implementation of getTableDefinition.
+     *
+     * @param string $name The name of the table.
+     * @return array A hash of columns, where the key is also the column name.
+     */
+    public function getTableDefinition($name)
+    {
+        $stmt = $this->pdo->prepare(sprintf(
+            "SELECT
+                COLUMN_NAME colname,
+                COLUMN_DEFAULT def,
+                IS_NULLABLE nullable,
+                DATA_TYPE coltype,
+                COLUMN_DEFAULT LIKE 'nextval(%%' is_serial
+            FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_%s = ? AND TABLE_NAME = ?
+                ORDER BY ORDINAL_POSITION ASC",
+            static::CATALOG_COLUMN
+        ));
+        $stmt->execute([$this->database, $name]);
+        $cols = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+            if (is_null($column['def'])) {
+                $column['def'] = 'NULL';
+            } else {
+                $column['def'] = $this->pdo->quote($column['def']);
+            }
+            $cols[$column['colname']] = $column;
+        }
+        return $cols;
+    }
+
+    public function getIndexes()
     {
         $stmt = $this->pdo->prepare(
             "SELECT
@@ -67,6 +102,28 @@ EOT;
             WHERE NOT nspname LIKE 'pg%' AND U.usename = ?");
         $stmt->execute([$this->database]);
         return $stmt->fetchAll();
+    }
+
+    public function dropRoutines()
+    {
+        $operations = [];
+        // Source: http://stackoverflow.com/questions/7622908/drop-function-without-knowing-the-number-type-of-parameters
+        $stmt = $this->pdo->prepare(
+            "SELECT format('DROP FUNCTION %s(%s);',
+                oid::regproc,
+                pg_get_function_identity_arguments(oid)) the_query
+            FROM pg_proc
+            WHERE proname = ?
+            AND pg_function_is_visible(oid)");
+        foreach ($this->getRoutines() as $routine) {
+            if (!$this->shouldIgnore($routine['routinename'])) {
+                $stmt->execute([$routine['routinename']]);
+                while ($query = $stmt->fetchColumn()) {
+                    $operations[] = $query;
+                }
+            }
+        }
+        return $operations;
     }
 }
 

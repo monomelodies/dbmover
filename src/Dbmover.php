@@ -18,9 +18,9 @@ abstract class Dbmover
     const DROP_ROUTINE_SUFFIX = '()';
 
     public $pdo;
-    protected $schemas = [];
-    protected $database;
-    protected $ignores = [];
+    public $schemas = [];
+    public $database;
+    public $ignores = [];
 
     /**
      * Constructor.
@@ -164,16 +164,7 @@ abstract class Dbmover
                 $operations[] = "DROP VIEW $view";
             }
         }
-        foreach ($this->getRoutines() as $routine) {
-            if (!$this->shouldIgnore($routine)) {
-                $operations[] = sprintf(
-                    "DROP %s %s%s",
-                    $routine['routinetype'],
-                    $routine['routinename'],
-                    static::DROP_ROUTINE_SUFFIX
-                );
-            }
-        }
+        $operations = array_merge($operations, $this->dropRoutines());
         foreach ($this->getTriggers() as $trigger) {
             if (!$this->shouldIgnore($trigger)) {
                 $operations[] = "DROP TRIGGER $trigger";
@@ -237,12 +228,12 @@ abstract class Dbmover
      * @param array $definition Key/value hash of column definition.
      * @return string SQL that adds this column to the table.
      */
-    protected function addColumn($table, array $definition)
+    public function addColumn($table, array $definition)
     {
         return sprintf(
             "ALTER TABLE %s ADD COLUMN %s %s%s%s",
             $table,
-            $definition['name'],
+            $definition['colname'],
             $definition['coltype'],
             $definition['nullable'] == 'NO' ?
                 ' NOT NULL' :
@@ -266,13 +257,13 @@ abstract class Dbmover
      * @return array An array of SQL statements that bring this column into the
      *  desired state.
      */
-    protected function alterColumn($table, array $definition)
+    public function alterColumn($table, array $definition)
     {
         $operations = [];
         $base = sprintf(
             "ALTER TABLE %s ALTER COLUMN %s",
             $table,
-            $definition['name']
+            $definition['colname']
         );
         $operations[] = "$base TYPE {$definition['coltype']}";
         if ($definition['nullable'] == 'NO') {
@@ -285,7 +276,7 @@ abstract class Dbmover
                 .is_null($definition['def']) ?
                     'NULL' :
                     $this->pdo->quote($definition['def']);
-        } else {
+        } elseif (!$definition['is_serial']) {
             $operations[] = "$base DROP DEFAULT";
         }
         return $operations;
@@ -298,7 +289,7 @@ abstract class Dbmover
      * @param string $sql The SQL to wrap.
      * @return string The input SQL potentially wrapped and called.
      */
-    protected function wrapInProcedure($sql)
+    public function wrapInProcedure($sql)
     {
         return $sql;
     }
@@ -313,7 +304,7 @@ abstract class Dbmover
      * @return array An array of hoisted statements (or an empty array if
      *  nothing matched).
      */
-    protected function hoist($regex, &$sql)
+    public function hoist($regex, &$sql)
     {
         $hoisted = [];
         if (preg_match_all($regex, $sql, $matches, PREG_SET_ORDER)) {
@@ -330,7 +321,7 @@ abstract class Dbmover
      *
      * @return array An array of table names.
      */
-    protected function getTables($type = 'BASE TABLE')
+    public function getTables($type = 'BASE TABLE')
     {
         $stmt = $this->pdo->prepare(sprintf(
             "SELECT TABLE_NAME
@@ -352,7 +343,7 @@ abstract class Dbmover
      * @param string $name The table name to check.
      * @return bool True or false.
      */
-    protected function tableExists($name, $type = 'BASE TABLE')
+    public function tableExists($name, $type = 'BASE TABLE')
     {
         $tables = $this->getTables($type);
         return in_array($name, $tables);
@@ -365,33 +356,7 @@ abstract class Dbmover
      * @param string $name The name of the table.
      * @return array A hash of columns, where the key is also the column name.
      */
-    protected function getTableDefinition($name)
-    {
-        $stmt = $this->pdo->prepare(sprintf(
-            "SELECT
-                COLUMN_NAME name,
-                COLUMN_DEFAULT def,
-                IS_NULLABLE nullable,
-                COLUMN_TYPE coltype,
-                COLUMN_KEY colkey,
-                EXTRA extra
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_%s = ? AND TABLE_NAME = ?
-            ORDER BY ORDINAL_POSITION ASC",
-            static::CATALOG_COLUMN
-        ));
-        $stmt->execute([$this->database, $name]);
-        $cols = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
-            if (is_null($column['def'])) {
-                $column['def'] = 'NULL';
-            } else {
-                $column['def'] = $this->pdo->quote($column['def']);
-            }
-            $cols[$column['name']] = $column;
-        }
-        return $cols;
-    }
+    public abstract function getTableDefinition($name);
 
     /**
      * Parse the table definition as specified in the schema into a format
@@ -400,42 +365,34 @@ abstract class Dbmover
      * @param string $schema The schema for this table (CREATE TABLE .. (...);)
      * @return array A hash of columns, where the key is also the column name.
      */
-    protected function parseTableDefinition($schema)
+    public function parseTableDefinition($schema)
     {
         preg_match("@CREATE TABLE \w+ \((.*)\)@ms", $schema, $extr);
         $lines = preg_split('@,$@m', rtrim($extr[1]));
-        $extra = $cols = [];
+        $cols = [];
         foreach ($lines as &$line) {
             $line = trim($line);
-            if (preg_match(
-                '@^(CONSTRAINT|UNIQUE|INDEX|PRIMARY)@',
-                trim($line)
-            )) {
-                $extra[] = $line;
-                continue;
-            }
             $column = [
-                'name' => '',
+                'colname' => '',
                 'def' => null,
                 'nullable' => 'YES',
                 'coltype' => '',
-                'colkey' => '',
-                'extra' => '',
+                'is_serial' => false,
             ];
             // Extract the name
             preg_match('@^\w+@', $line, $name);
-            $column['name'] = $name[0];
+            $column['colname'] = $name[0];
             $line = str_replace($name[0], '', $line);
             if (!$this->isNullable($line)) {
                 $column['nullable'] = 'NO';
             }
             $line = str_replace($name[0], '', $line);
-            if ($this->isAutoIncrement($line)) {
-                $column['extra'] = 'auto_increment';
-            }
             $line = str_replace($name[0], '', $line);
             if ($this->isPrimaryKey($line)) {
                 $column['key'] = 'PRI';
+            }
+            if ($this->isSerial($line)) {
+                $column['is_serial'] = true;
             }
             $line = str_replace($name[0], '', $line);
             if ($default = $this->getDefaultValue($line)) {
@@ -456,7 +413,7 @@ abstract class Dbmover
      * @return string|null The default value of the column, if specified. If no
      *  default was specified, null.
      */
-    protected function getDefaultValue(&$column)
+    public function getDefaultValue(&$column)
     {
         if (preg_match('@DEFAULT (.*?)($| )@', $column, $default)) {
             $column = str_replace($default[0], '', $column);
@@ -471,7 +428,7 @@ abstract class Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isNullable(&$column)
+    public function isNullable(&$column)
     {
         if (strpos($column, 'NOT NULL')) {
             $column = str_replace('NOT NULL', '', $column);
@@ -481,12 +438,15 @@ abstract class Dbmover
     }
 
     /**
-     * Checks whether a column is an auto_increment column.
+     * Checks whether a column is a "serial" column.
+     *
+     * Vendors have different implementations of this, e.g. MySQL "tags" the
+     * column as "auto_increment" whilst PostgreSQL uses a `SERIAL` data type.
      *
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected abstract function isAutoIncrement(&$column);
+    public abstract function isSerial(&$column);
     
     /**
      * Checks whether a column is a primary key.
@@ -494,14 +454,14 @@ abstract class Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected abstract function isPrimaryKey(&$column);
+    public abstract function isPrimaryKey(&$column);
 
     /**
      * Return a list of all routines in the current catalog.
      *
      * @return array Array of routines, including meta-information.
      */
-    protected function getRoutines()
+    public function getRoutines()
     {
         $stmt = $this->pdo->prepare(sprintf(
             "SELECT
@@ -516,12 +476,28 @@ abstract class Dbmover
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function dropRoutines()
+    {
+        $operations = [];
+        foreach ($this->getRoutines() as $routine) {
+            if (!$this->shouldIgnore($routine)) {
+                $operations[] = sprintf(
+                    "DROP %s %s%s",
+                    $routine['routinetype'],
+                    $routine['routinename'],
+                    static::DROP_ROUTINE_SUFFIX
+                );
+            }
+        }
+        return $operations;
+    }
+
     /**
      * Return a list of all triggers in the current catalog.
      *
      * @return array Array of trigger names.
      */
-    protected function getTriggers()
+    public function getTriggers()
     {
         $stmt = $this->pdo->prepare(sprintf(
             "SELECT TRIGGER_NAME triggername
@@ -544,7 +520,7 @@ abstract class Dbmover
      *
      * @param string $object The name of the object to test.
      */
-    protected function shouldIgnore($object)
+    public function shouldIgnore($object)
     {
         foreach ($this->ignores as $regex) {
             if (preg_match($regex, $object)) {

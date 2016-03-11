@@ -2,6 +2,8 @@
 
 namespace Dbmover;
 
+use PDO;
+
 class Mysql extends Dbmover
 {
     const CATALOG_COLUMN = 'SCHEMA';
@@ -23,7 +25,7 @@ class Mysql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isAutoIncrement(&$column)
+    public function isSerial(&$column)
     {
         if (strpos($column, 'AUTO_INCREMENT') !== false) {
             $column = str_replace('AUTO_INCREMENT', '', $column);
@@ -38,7 +40,7 @@ class Mysql extends Dbmover
      * @param string $column The referenced column definition.
      * @return bool
      */
-    protected function isPrimaryKey(&$column)
+    public function isPrimaryKey(&$column)
     {
         if (strpos($column, 'PRIMARY KEY')) {
             $column = str_replace('PRIMARY KEY', '', $column);
@@ -53,7 +55,7 @@ class Mysql extends Dbmover
      * @param string $sql The SQL to wrap.
      * @return string The input SQL wrapped and called.
      */
-    protected function wrapInProcedure($sql)
+    public function wrapInProcedure($sql)
     {
         $tmp = 'tmp_'.md5(microtime(true));
         return <<<EOT
@@ -75,21 +77,21 @@ EOT;
      * @return array An array of SQL, in this case containing a single
      *  ALTER TABLE statement.
      */
-    protected function alterColumn($name, array $definition)
+    public function alterColumn($name, array $definition)
     {
         $sql = $this->addColumn($name, $definition);
         $sql = str_replace(
             ' ADD COLUMN ',
-            " CHANGE COLUMN {$definition['name']} ",
+            " CHANGE COLUMN {$definition['colname']} ",
             $sql
         );
-        if ($definition['extra'] == 'auto_increment') {
+        if ($definition['is_serial']) {
             $sql .= ' AUTO_INCREMENT';
         }
         return [$sql];
     }
 
-    protected function getIndexes()
+    public function getIndexes()
     {
         $stmt = $this->pdo->prepare(
             "SELECT DISTINCT table_name AS tbl,
@@ -99,6 +101,39 @@ EOT;
         );
         $stmt->execute([$this->database]);
         return $stmt->fetchAll();
+    }
+
+    /**
+     * MySQL-specific implementation of getTableDefinition.
+     *
+     * @param string $name The name of the table.
+     * @return array A hash of columns, where the key is also the column name.
+     */
+    public function getTableDefinition($name)
+    {
+        $stmt = $this->pdo->prepare(sprintf(
+            "SELECT
+                COLUMN_NAME colname,
+                COLUMN_DEFAULT def,
+                IS_NULLABLE nullable,
+                DATA_TYPE coltype,
+                (EXTRA = 'auto_increment') is_serial
+            FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_%s = ? AND TABLE_NAME = ?
+                ORDER BY ORDINAL_POSITION ASC",
+            static::CATALOG_COLUMN
+        ));
+        $stmt->execute([$this->database, $name]);
+        $cols = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+            if (is_null($column['def'])) {
+                $column['def'] = 'NULL';
+            } else {
+                $column['def'] = $this->pdo->quote($column['def']);
+            }
+            $cols[$column['colname']] = $column;
+        }
+        return $cols;
     }
 }
 
