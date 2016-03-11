@@ -276,7 +276,7 @@ abstract class Dbmover
                 .is_null($definition['def']) ?
                     'NULL' :
                     $this->pdo->quote($definition['def']);
-        } else {
+        } elseif (!$definition['is_serial']) {
             $operations[] = "$base DROP DEFAULT";
         }
         return $operations;
