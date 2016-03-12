@@ -104,6 +104,22 @@ EOT;
         return $stmt->fetchAll();
     }
 
+    /**
+     * Generate drop statements for all indexes in the database.
+     *
+     * @return array Array of SQL operations.
+     */
+    public function dropIndexes()
+    {
+        $operations = [];
+        if ($indexes = $this->getIndexes()) {
+            foreach ($indexes as $index) {
+                $operations[] = "DROP INDEX {$index['idx']}";
+            }
+        }
+        return $operations;
+    }
+
     public function dropRoutines()
     {
         $operations = [];
