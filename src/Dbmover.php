@@ -246,17 +246,7 @@ abstract class Dbmover
      *
      * @return array Array of SQL operations.
      */
-    public function dropIndexes()
-    {
-        $operations = [];
-        if ($indexes = $this->getIndexes()) {
-            foreach ($indexes as $index) {
-                $operations[] = "ALTER TABLE {$index['tbl']}
-                    DROP INDEX {$index['idx']}";
-            }
-        }
-        return $operations;
-    }
+    public abstract function dropIndexes();
 
     /**
      * Generate drop statements for all triggers in the database.

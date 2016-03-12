@@ -105,6 +105,23 @@ EOT;
     }
 
     /**
+     * Generate drop statements for all indexes in the database.
+     *
+     * @return array Array of SQL operations.
+     */
+    public function dropIndexes()
+    {
+        $operations = [];
+        if ($indexes = $this->getIndexes()) {
+            foreach ($indexes as $index) {
+                $operations[] = "DROP INDEX {$index['idx']}
+                    ON {$index['tbl']}";
+            }
+        }
+        return $operations;
+    }
+
+    /**
      * MySQL-specific implementation of getTableDefinition.
      *
      * @param string $name The name of the table.
