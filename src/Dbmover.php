@@ -314,9 +314,9 @@ abstract class Dbmover
         }
         if ($definition['def'] != '') {
             $operations[] = "$base SET DEFAULT "
-                .is_null($definition['def']) ?
+                .(is_null($definition['def']) ?
                     'NULL' :
-                    $this->pdo->quote($definition['def']);
+                    $definition['def']);
         } elseif (!$definition['is_serial']) {
             $operations[] = "$base DROP DEFAULT";
         }
@@ -436,7 +436,7 @@ abstract class Dbmover
                 $column['is_serial'] = true;
             }
             $line = str_replace($name[0], '', $line);
-            if ($default = $this->getDefaultValue($line)) {
+            if (null !== ($default = $this->getDefaultValue($line))) {
                 $column['def'] = $default;
             }
             $line = str_replace($name[0], '', $line);
