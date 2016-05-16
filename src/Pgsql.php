@@ -31,8 +31,9 @@ class Pgsql extends Dbmover
      */
     public function isPrimaryKey(&$column)
     {
+        $check = strpos($column, 'PRIMARY KEY') !== false;
         $column = str_replace('PRIMARY KEY', '', $column);
-        return strpos($column, 'SERIAL');
+        return $check;
     }
 
     /**

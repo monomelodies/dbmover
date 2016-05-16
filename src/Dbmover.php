@@ -92,10 +92,6 @@ abstract class Dbmover
         // Hoist all other recreatable objects.
         $hoists = array_merge(
             $this->hoist(
-                '@^CREATE VIEW.*?;$@ms',
-                $sql
-            ),
-            $this->hoist(
                 static::REGEX_PROCEDURES,
                 $sql
             ),
@@ -103,6 +99,10 @@ abstract class Dbmover
                 static::REGEX_TRIGGERS,
                 $sql
             )
+        );
+        $views = $this->hoist(
+            '@^CREATE VIEW.*?;$@ms',
+            $sql
         );
 
         $operations = array_merge($operations, $this->dropRecreatables());
@@ -137,6 +137,15 @@ abstract class Dbmover
                             $this->alterColumn($name, $definition)
                         );
                     }
+                    if (isset($definition['key'])
+                        && $definition['key'] == 'PRI'
+                    ) {
+                        $operations[] = sprintf(
+                            "ALTER TABLE %s ADD PRIMARY KEY(%s)",
+                            $name,
+                            $col
+                        );
+                    }
                 }
             }
         }
@@ -153,6 +162,9 @@ abstract class Dbmover
         if (strlen(trim($sql))) {
             $operations[] = $sql;
         }
+
+        // Recrate views
+        $operations = array_merge($operations, $views);
 
         // Rerun ifs and alters
         $operations = array_merge($operations, $alter, $ifs);
@@ -181,8 +193,8 @@ abstract class Dbmover
             try {
                 $this->pdo->exec($operation);
             } catch (PDOException $e) {
-                if (!preg_match("@^DROP@", $operation)) {
-                    $fails[] = [count($operations), $operation, $e->getMessage()];
+                if (preg_match("@^(ALTER|CREATE)@", $operation)) {
+                    $fails[] = $operation;
                 }
             }
             $bar->progress();
@@ -197,6 +209,13 @@ abstract class Dbmover
         
         $bar->end();
         echo "\033[0m";
+        if ($fails) {
+            echo "The following operations raised an exception:\n";
+            echo "(This might not be a problem necessarily):\n";
+            foreach ($fails as $fail) {
+                echo "$fail\n";
+            }
+        }
     }
 
     /**
@@ -233,7 +252,7 @@ abstract class Dbmover
         $stmt = $this->pdo->prepare(sprintf(
             "SELECT TABLE_NAME tbl, CONSTRAINT_NAME constr
                 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                WHERE CONSTRAINT_TYPE = 'FOREIGN KEY'
+                WHERE CONSTRAINT_TYPE IN ('PRIMARY KEY', 'FOREIGN KEY')
                     AND CONSTRAINT_%s = ?",
             static::CATALOG_COLUMN
         ));
@@ -241,8 +260,10 @@ abstract class Dbmover
         if ($fks = $stmt->fetchAll()) {
             foreach ($fks as $row) {
                 $operations[] = sprintf(
-                    "ALTER TABLE {$row['tbl']} DROP %s {$row['constr']}",
-                    static::DROP_CONSTRAINT
+                    "ALTER TABLE %s DROP %s IF EXISTS %s CASCADE",
+                    $row['tbl'],
+                    static::DROP_CONSTRAINT,
+                    $row['constr']
                 );
             }
         }
