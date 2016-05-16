@@ -197,7 +197,6 @@ abstract class Dbmover
         
         $bar->end();
         echo "\033[0m";
-        var_dump($fails);
     }
 
     /**
@@ -462,7 +461,6 @@ abstract class Dbmover
     public function getDefaultValue(&$column)
     {
         if (preg_match('@DEFAULT (.*?)($| )@', $column, $default)) {
-            var_dump($column, $default);
             $column = str_replace($default[0], '', $column);
             return $default[1];
         }
