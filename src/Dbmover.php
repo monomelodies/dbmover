@@ -163,6 +163,9 @@ abstract class Dbmover
             $operations[] = $sql;
         }
 
+        // Recrate views
+        $operations = array_merge($operations, $views);
+
         // Rerun ifs and alters
         $operations = array_merge($operations, $alter, $ifs);
 
