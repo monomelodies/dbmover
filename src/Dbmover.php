@@ -38,6 +38,7 @@ abstract class Dbmover
         $user = isset($settings['user']) ? $settings['user'] : null;
         $pass = isset($settings['pass']) ? $settings['pass'] : null;
         $options = isset($settings['options']) ? $settings['options'] : [];
+        $options[PDO::ATTR_ERRMODE] = PDO::ERRMODE_EXCEPTION;
         $this->pdo = new PDO($dsn, $user, $pass, $options);
         if (isset($options['ignore']) && is_array($options['ignore'])) {
             $this->ignores = $options['ignore'];
@@ -175,8 +176,15 @@ abstract class Dbmover
 
         $bar->setColorToRed();
 
+        $fails = [];
         while ($operation = array_shift($operations)) {
-            $this->pdo->exec($operation);
+            try {
+                $this->pdo->exec($operation);
+            } catch (PDOException $e) {
+                if (!preg_match("@^DROP@", $operation)) {
+                    $fails[] = [count($operations), $operation, $e->getMessage()];
+                }
+            }
             $bar->progress();
 
             if ($bar->getCurrentstep() >= ($bar->getSteps() / 2)) {
@@ -189,6 +197,7 @@ abstract class Dbmover
         
         $bar->end();
         echo "\033[0m";
+        var_dump($fails);
     }
 
     /**
@@ -423,23 +432,19 @@ abstract class Dbmover
             // Extract the name
             preg_match('@^\w+@', $line, $name);
             $column['colname'] = $name[0];
-            $line = str_replace($name[0], '', $line);
+            $line = preg_replace("@^{$name[0]}@", '', $line);
             if (!$this->isNullable($line)) {
                 $column['nullable'] = 'NO';
             }
-            $line = str_replace($name[0], '', $line);
-            $line = str_replace($name[0], '', $line);
             if ($this->isPrimaryKey($line)) {
                 $column['key'] = 'PRI';
             }
             if ($this->isSerial($line)) {
                 $column['is_serial'] = true;
             }
-            $line = str_replace($name[0], '', $line);
             if (null !== ($default = $this->getDefaultValue($line))) {
                 $column['def'] = $default;
             }
-            $line = str_replace($name[0], '', $line);
             $line = preg_replace('@REFERENCES.*?$@', '', $line);
             $column['coltype'] = strtolower(trim($line));
             $cols[$name[0]] = $column;
@@ -457,6 +462,7 @@ abstract class Dbmover
     public function getDefaultValue(&$column)
     {
         if (preg_match('@DEFAULT (.*?)($| )@', $column, $default)) {
+            var_dump($column, $default);
             $column = str_replace($default[0], '', $column);
             return $default[1];
         }
