@@ -437,7 +437,7 @@ abstract class Dbmover
      */
     public function parseTableDefinition($schema)
     {
-        preg_match("@CREATE TABLE \w+ \((.*)\)@ms", $schema, $extr);
+        preg_match("@CREATE.*?TABLE \w+ \((.*)\)@ms", $schema, $extr);
         $lines = preg_split('@,$@m', rtrim($extr[1]));
         $cols = [];
         foreach ($lines as &$line) {
