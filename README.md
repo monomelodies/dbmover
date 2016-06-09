@@ -323,6 +323,23 @@ goes for MySQL as well, although the above problem isn't applicable there).
 you could include something like ```DROP unrelated_database;``` in the schema
 file. You'd only have yourself to blame of course, but best to avoid the risk.
 
+### Sequences in PostgreSQL
+PostgreSQL stores "auto_increment" unique ID's in so called "sequences" (to all
+intents and purposes, a "special" separate table). To allow migrations to run
+correctly, you should write these in the following manner:
+
+```sql
+CREATE SEQUENCE IF NOT EXISTS mytable_id_seq;
+CREATE TABLE mytable (
+    id BIGINT NOT NULL PRIMARY KEY DEFAULT NEXTVAL('auth_id_seq'::regclass),
+    -- ...other table info...
+);
+```
+
+One can also use a shorthand `SERIAL` or `BIGSERIAL` type that automates this
+process, but that doesn't play well with DbMover's analysis and table
+modification statements.
+
 ## Contributing
 SQLite support is sort-of planned for the near future, but is not extremely high
 on my priority list (clients use it occasionally, but it's really not a database
