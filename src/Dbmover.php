@@ -113,6 +113,7 @@ abstract class Dbmover
         $tablenames = [];
         foreach ($tables as $table) {
             if (!(preg_match('@^CREATE.*?TABLE (\w+) ?\(@', $table, $name))) {
+                $operations[] = $table;
                 continue;
             }
             $name = $name[1];
