@@ -87,7 +87,10 @@ abstract class Dbmover
         }
 
         $operations = array_merge($operations, $ifs);
-        $tables = $this->hoist('@^CREATE([A-Z]|\s)*TABLE .*?;$@ms', $sql);
+        $tables = $this->hoist(
+            '@^CREATE([A-Z]|\s)*(TABLE|SEQUENCE) .*?;$@ms',
+            $sql
+        );
 
         // Hoist all other recreatable objects.
         $hoists = array_merge(
@@ -109,7 +112,9 @@ abstract class Dbmover
 
         $tablenames = [];
         foreach ($tables as $table) {
-            preg_match('@^CREATE.*?TABLE (\w+) ?\(@', $table, $name);
+            if (!(preg_match('@^CREATE.*?TABLE (\w+) ?\(@', $table, $name))) {
+                continue;
+            }
             $name = $name[1];
             $tablenames[] = $name;
 
